@@ -17,7 +17,7 @@ The purpose of the recognition task is to make the finalized model recognize 3D 
 
 <p align="center">
   <img 
-    src="https://user-images.githubusercontent.com/7215154/182039576-98f605f0-955d-466e-9ee9-a7097d6b586b.svg" 
+    src="https://user-images.githubusercontent.com/7215154/182615070-e8efa1bb-9a63-4bd2-920e-7f6cdb696814.svg" 
   >
 </p>
 
@@ -62,7 +62,7 @@ Even though few manufacturing parts are almost indistinguishable in the dataset,
 
 <p align="center">
   <img 
-    src="https://user-images.githubusercontent.com/7215154/182582012-17930ca2-7ff9-4ad2-b9fb-62df7c918844.svg" 
+    src="https://user-images.githubusercontent.com/7215154/182616198-24585bd9-5954-4f60-8ceb-eb9ec29aeae9.svg" 
   >
 </p>
 
