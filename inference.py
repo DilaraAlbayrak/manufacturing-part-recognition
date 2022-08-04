@@ -58,7 +58,6 @@ def image_loader(data_transforms, image, rotate_angle):
     return tensor_image
 
 def get_inputs(image1,image2,image3):
-    print("get_inputs")
     #convert images to tensors
     tensor1=image_loader(transform,image1,0) 
     tensor2=image_loader(transform,image2,0) 
@@ -71,7 +70,7 @@ def get_inputs(image1,image2,image3):
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 num_classes = args.num_classes
-label = args.label
+label = args.label # actual label
 
 if args.model == RESNET:
     if args.depth == 18:
@@ -114,7 +113,6 @@ load_checkpoint()
 
 # camera stuffs
 device = torch.device("cuda")
-print('Done')
 
 tlFactory = pylon.TlFactory.GetInstance()
 
@@ -122,20 +120,24 @@ devices = tlFactory.EnumerateDevices()
 if len(devices) == 0:
     raise pylon.RUNTIME_EXCEPTION("No camera present.")
 
-maxCamerasToUse = 3
+num_cameras = 3
 
-cameras = pylon.InstantCameraArray(min(len(devices), maxCamerasToUse))
+cameras = pylon.InstantCameraArray(min(len(devices), num_cameras))
 
 l = cameras.GetSize()
 
 cam_ip_dict = {}
 
-ip_order = ['192.168.1.200' ,'192.168.1.201', '192.168.1.202']
+ip1 = '' 
+ip2 = ''
+ip3 = ''
+
+ip_order = [ip1, ip2, ip3]
 
 # Create and attach all Pylon Devices.
 for i, cam in enumerate(cameras):
-    cam.Attach(tlFactory.CreateDevice(devices[i]))
 
+    cam.Attach(tlFactory.CreateDevice(devices[i]))
     ip = cam.GetDeviceInfo().GetIpAddress()
 
     # Print the model name of the camera.
@@ -160,27 +162,9 @@ converter = pylon.ImageFormatConverter()
 
 converter.OutputPixelFormat = pylon.PixelType_Mono8
 converter.OutputBitAlignment = pylon.OutputBitAlignment_MsbAligned
-# end of camera stuffs
 
-# ui and demo stuffs
-start_flag=1
-img1_array=[]   
-img2_array=[]
-img3_array=[]
-
+# to save results visually
 image_save_count = 0  
-
-process_time = 0
-
-top_1st = []
-top_2nd = []
-top_3rd = []
-# end of ui and demo stuffs
-
-top_1st = []
-top_2nd = []
-top_3rd = []
-
 img_num_to_save = 200
 
 correctly_labeled = 0
@@ -195,115 +179,77 @@ n = 0
 avg_test_acc = 0
 avg_loss = 0
 
+
 while True:
     with torch.no_grad():
-        if(start_flag==1):
-            image_arr = []
+        
+        image_arr = []
 
-            for ip in ip_order:
-                camera = cam_ip_dict[ip]
-                grabResult = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
+        for ip in ip_order:
+            camera = cam_ip_dict[ip]
+            grabResult = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
 
-                if grabResult.GrabSucceeded():
-                    image = converter.Convert(grabResult)
-                    image_arr.append(image.GetArray())
+            if grabResult.GrabSucceeded():
+                image = converter.Convert(grabResult)
+                image_arr.append(image.GetArray())
 
-            if len(image_arr) == 3:
-                img1_ = image_arr[0]
-                img2_ = image_arr[1]
-                img3_ = image_arr[2]
+            
+        img1_ = image_arr[0]
+        img2_ = image_arr[1]
+        img3_ = image_arr[2]
 
-                img1 = img1_[0:1200, 0:1200]
-                img2 = img2_[0:1200, 0:1200]
-                img3 = img3_[0:1200, 720:1920]
+        img1 = img1_[0:1200, 0:1200]
+        img2 = img2_[0:1200, 0:1200]
+        img3 = img3_[0:1200, 720:1920]     
 
-                img1_array.append(img1)
-                img2_array.append(img2)
-                img3_array.append(img3)
-                
+        inputs = get_inputs(img1, img2, img3)
+        inputs = inputs.cuda(device)
+        inputs = Variable(inputs)
+        outputs = model(inputs)
+        targets = torch.tensor([int(label)])
 
-                inputs = get_inputs(img1, img2, img3)
-                inputs = inputs.cuda(device)
-                inputs = Variable(inputs)
-                #print(inputs)
-                outputs = model(inputs)
-                targets = torch.tensor([int(label)])
+        targets = targets.cuda(device)
+        targets = Variable(targets)
 
-                targets = targets.cuda(device)
-                targets = Variable(targets)
+        loss = criterion(outputs, targets)
 
-                loss = criterion(outputs, targets)
+        total_loss += loss
+        n += 1
 
-                total_loss += loss
-                n += 1
+        _, predicted = torch.max(outputs.data, 1)
+        total += targets.size(0)
+        correct += (predicted.cpu() == targets.cpu()).sum()
 
-                _, predicted = torch.max(outputs.data, 1)
-                total += targets.size(0)
-                correct += (predicted.cpu() == targets.cpu()).sum()
+        avg_test_acc = 100 * correct / total
+        avg_loss = total_loss / n
 
-                avg_test_acc = 100 * correct / total
-                avg_loss = total_loss / n
+        predicted_str = str(int(predicted))
 
-                predicted_str = str(int(predicted))
+        if predicted_str == label:
+            correctly_labeled += 1
+        else:
+            incorrectly_labeled +=1
 
-                print(label + '\t' + predicted_str)
+        outputs = torch.nn.functional.softmax(outputs,dim=1)
 
-                if predicted_str == label:
-                    correctly_labeled += 1
-                else:
-                    incorrectly_labeled +=1
+        cv2.imwrite("demo_images/view1/view1_" + str(image_save_count) + ".jpg", cv2.resize(img1,(len(img1[0])//4,len(img1)//4)))
+        cv2.imwrite("demo_images/view2/view2_" + str(image_save_count) + ".jpg", cv2.resize(img2,(len(img2[0])//4,len(img2)//4)))
+        cv2.imwrite("demo_images/view3/view3_" + str(image_save_count) + ".jpg", cv2.resize(img3,(len(img3[0])//4,len(img3)//4)))
 
-                outputs = torch.nn.functional.softmax(outputs,dim=1)
+        cv2.imwrite("demo_images/result1/result1_" + str(image_save_count) + ".jpg", cv2.resize(top1,(len(top1[0])//2,len(top1)//2)))
+        
+        if image_save_count > img_num_to_save:
+            break
 
-                top1_value = float(torch.topk(outputs.data, 3).values[0][0]) * 100
-                top2_value = float(torch.topk(outputs.data, 3).values[0][1]) * 100
-                top3_value = float(torch.topk(outputs.data, 3).values[0][2]) * 100
-
-                top_1st.append(round(top1_value,3))
-                top_2nd.append(round(top2_value,3))
-                top_3rd.append(round(top3_value,3))
-                
-
-                top1 = cv2.imread("show/" + str(int(torch.topk(outputs.data, 3).indices[0][0])) + ".jpg") #indices[0][0], indices[0][1]
-                top2 = cv2.imread("show/" + str(int(torch.topk(outputs.data, 3).indices[0][1])) + ".jpg")
-                top3 = cv2.imread("show/" + str(int(torch.topk(outputs.data, 3).indices[0][2])) + ".jpg")
-
-                cv2.imwrite("demo_images/view1/view1_" + str(image_save_count) + ".jpg", cv2.resize(img1,(len(img1[0])//4,len(img1)//4)))
-                cv2.imwrite("demo_images/view2/view2_" + str(image_save_count) + ".jpg", cv2.resize(img2,(len(img2[0])//4,len(img2)//4)))
-                cv2.imwrite("demo_images/view3/view3_" + str(image_save_count) + ".jpg", cv2.resize(img3,(len(img3[0])//4,len(img3)//4)))
-
-                cv2.imwrite("demo_images_high_res/view1/view1_" + str(image_save_count) + ".jpg", img1)
-                cv2.imwrite("demo_images_high_res/view2/view2_" + str(image_save_count) + ".jpg", img2)
-                cv2.imwrite("demo_images_high_res/view3/view3_" + str(image_save_count) + ".jpg", img3)
-
-                cv2.imwrite("demo_images/result1/result1_" + str(image_save_count) + ".jpg", cv2.resize(top1,(len(top1[0])//2,len(top1)//2)))
-                cv2.imwrite("demo_images/result2/result2_" + str(image_save_count) + ".jpg", cv2.resize(top2,(len(top1[0])//2,len(top2)//2)))
-                cv2.imwrite("demo_images/result3/result3_" + str(image_save_count) + ".jpg", cv2.resize(top3,(len(top1[0])//2,len(top3)//2)))
-
-                image_save_count += 1
-
-                if image_save_count > img_num_to_save-1:
-
-                    print("correctly_labeled ", correctly_labeled)
-                    print("incorrectly_labeled ", incorrectly_labeled)
-                    print("avg_test_acc ", avg_test_acc)
-                    print("avg_loss ", avg_loss)
-
-                    break
-
+        image_save_count += 1
 
 # table description
 cols = [
     Col('id1', '#'), # 1-based indexing
-    Col("img", "View 1", "demo_images/view1/view1_*.jpg"),             # make a column of 1-based indices
-    Col("img", "View 2", "demo_images/view2/view2_*.jpg"),             # specify image content for column 2
-    Col("img", "View 3", "demo_images/view3/view3_*.jpg"),     # specify image content for column 3
-    Col("img", "Result", "demo_images/result1/result1_*.jpg"), # specify image content for column 4
-    Col("img", "Result", "demo_images/result2/result2_*.jpg"), # specify image content for column 4
-    Col("img", "Result", "demo_images/result3/result3_*.jpg"), # specify image content for column 4
-    Col('text', 'Top 1st', top_1st),
-    Col('text', 'Top 2nd', top_2nd),
-    Col('text', 'Top 3rd', top_3rd),
+    Col("img", "view 1", "demo_images/view1/view1_*.jpg"),             # make a column of 1-based indices
+    Col("img", "view 2", "demo_images/view2/view2_*.jpg"),             # specify image content for column 2
+    Col("img", "view 3", "demo_images/view3/view3_*.jpg"),     # specify image content for column 3
+    Col("img", "prediction", "demo_images/result1/result1_*.jpg"), # specify image content for column 4
 ]
 
 html_file_name = 'results.html'

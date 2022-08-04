@@ -139,7 +139,6 @@ class ResNet(nn.Module):
     def forward(self, x):
         # Swap batch and views dims
         x = x.transpose(0, 1)
-        #print(x.shape)
 
         # View pool
         view_pool = []
@@ -177,7 +176,6 @@ def resnet18(pretrained=False, **kwargs):
     """
     model = ResNet(BasicBlock, [2, 2, 2, 2], **kwargs)
     if pretrained:
-        print("here")
         pretrained_dict = model_zoo.load_url(model_urls['resnet18'])
         model_dict = model.state_dict()
         pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict and v.shape == model_dict[k].shape}
@@ -192,10 +190,9 @@ def resnet34(pretrained=False, **kwargs):
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    print("pretrained ", pretrained)
+
     model = ResNet(BasicBlock, [3, 4, 6, 3], **kwargs)
     if pretrained:
-        print("here34")
         pretrained_dict = model_zoo.load_url(model_urls['resnet34'])
         model_dict = model.state_dict()
         pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict and v.shape == model_dict[k].shape}
@@ -212,7 +209,6 @@ def resnet50(pretrained=False, **kwargs):
     """
     model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
     if pretrained:
-        print("here50")
         pretrained_dict = model_zoo.load_url(model_urls['resnet50'])
         model_dict = model.state_dict()
         pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict and v.shape == model_dict[k].shape}

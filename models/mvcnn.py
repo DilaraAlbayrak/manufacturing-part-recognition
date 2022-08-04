@@ -69,7 +69,6 @@ def mvcnn(pretrained=False, **kwargs):
     """
     model = MVCNN(**kwargs)
     if pretrained:
-        print("mvcnn")
         pretrained_dict = model_zoo.load_url(model_urls['alexnet'])
         model_dict = model.state_dict()
         # 1. filter out unnecessary keys

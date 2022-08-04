@@ -25,7 +25,6 @@ def densenet121(pretrained=False, **kwargs):
     model = DenseNet(num_init_features=64, growth_rate=32, block_config=(6, 12, 24, 16),
                      **kwargs)
     if pretrained:
-        print("here")
         model.load_state_dict(model_zoo.load_url(model_urls['densenet121']))
     return model
 
