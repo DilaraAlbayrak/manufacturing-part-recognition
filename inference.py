@@ -110,10 +110,9 @@ def load_checkpoint():
 
 load_checkpoint()
 
-
-# camera stuffs
 device = torch.device("cuda")
 
+# Connect to cameras (Pylon)
 tlFactory = pylon.TlFactory.GetInstance()
 
 devices = tlFactory.EnumerateDevices()
